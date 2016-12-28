@@ -1,0 +1,116 @@
+---
+title: "Prediction Assignment Writeup"
+author: "Sam"
+date: "Dec 27, 2016"
+output: html_document
+---
+
+## Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, our goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants .
+
+## Dataset
+
+The dataset used here is the weight Lifting Exercise dataset.
+It was created by measuring several individuals performing a weight lifting exercise, in one of several ways: correctly, and while making one of several common mistakes.
+
+Various physical measurements of their movement were made recording position, momentum, orientation, of several body parts. The goal was to be able to detect whether the exercise is performed correctly, or detect a specific mistake, based on these physical measurements.
+
+Training data : https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+Testing data : https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+
+## Environment setup
+
+Installing packages , loading libraries and setting the seed for reproducibility.
+
+```{r}
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(rattle)
+library(randomForest)
+library(RColorBrewer)
+set.seed(1234)
+```
+
+## Reading and Pre-processing 
+
+Few columns in the dataset do not play any role in prediction.For example-
+The first 7 features: id , user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp, new_window, num_window. Also few features are almost constant (Also called near zero variance) over the entire dataset.Hence they do not add any value to the dataset and should be removed.
+
+```{r}
+training <- read.csv("C:\\Users\\DELL PC\\Downloads\\pml-training.csv", na.strings = c("NA", "", "#DIV/0!"))
+testing <- read.csv("C:\\Users\\DELL PC\\Downloads\\pml-testing.csv", na.strings = c("NA", "", "#DIV/0!"))
+dim(training)
+dim(testing)
+
+training <- training[,-c(1,2,3,4,5,6,7)]
+
+training <- training[,-nearZeroVar(training)]
+
+```
+Finally the features with many NA values (threshold 60%) are removed.
+
+```{r}
+AllNA    <- sapply(training, function(x) mean(is.na(x))) > 0.6
+training <- training[, AllNA==FALSE]
+dim(training)
+```
+Applying the same transformation to the testing data
+```{r}
+clean1 <- colnames(training[,-ncol(training)])
+testing <- testing [clean1]
+dim(testing)
+```
+## Training and validation sets
+
+Partioning training data into 2 sets :myTraining and myTesting.
+```{r}
+inTrain <- createDataPartition(y=training$classe, p=0.6, list=FALSE)
+myTraining <- training[inTrain,]
+myTesting <- training[-inTrain,]
+dim(myTraining)
+dim(myTesting)
+
+```
+
+## Prediction 
+
+# Decision tree
+
+After getting the clean data set from the above processing, we use decision tree and random forest to build a model on myTraining data. We use myTesting data to evaluate the performance of our model. 
+
+```{r}
+modelFit1 <- rpart(classe ~.,data=myTraining, method="class")
+fancyRpartPlot(modelFit1)
+predictions1 <- predict(modelFit1, myTesting, type="class")
+confusionMatrix(predictions1,myTesting$classe)
+```
+
+# Random Forest
+
+```{r}
+modelFit2 <- randomForest(classe ~.,data=myTraining)
+predictions2 <- predict(modelFit2, myTesting)
+confusionMatrix(predictions2,myTesting$classe)
+```
+
+## Prediction out-of-sample error
+
+Finally, we apply the model to the 20 unlabeled assignment cases. For this we train the model on all labeled cases (both the training and validation set). Note that generally over-fitting decreases with increased sample size, and we are now increasing the sample size by 67% (from 60% to 100% of the available cases). Thus the estimate of out-of-sample error from the previous section is probably too pessimistic.
+
+The random forest model is used since it yielded much better accuracy than decision tree.
+```{r}
+modelFit3 <- randomForest(classe ~.,data=training)
+predictions3 <- predict(modelFit3, testing)
+predictions3
+
+```
+
+
+
+
+
+
